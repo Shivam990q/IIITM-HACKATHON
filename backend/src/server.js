@@ -24,7 +24,8 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'http://127.0.0.1:5173',
       'http://127.0.0.1:8050',
       'http://127.0.0.1:3000',
-      'http://localhost:5000'
+      'http://localhost:5000',
+      'https://nyaychain.onrender.com'
     ];
 
 // Middleware
@@ -48,7 +49,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('dev'));
 
 // Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+const uploadPath = process.env.UPLOAD_PATH 
+  ? process.env.UPLOAD_PATH
+  : path.join(__dirname, '../uploads');
+
+app.use('/uploads', express.static(uploadPath));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -80,7 +85,7 @@ mongoose
   .connect(MONGODB_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB successfully');
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📖 API Documentation: http://localhost:${PORT}/api/health`);
     });
