@@ -1,0 +1,14 @@
+{
+  "name": "nyaychain",
+  "version": "1.0.0",
+  "description": "NyayChain - Blockchain Governance Platform",
+  "scripts": {
+    "start": "node run-dev.js",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev",
+    "init-admin": "cd backend && npm run init-admin",
+    "test": "cd backend && npm test"
+  },
+  "author": "",
+  "license": "ISC"
+} 

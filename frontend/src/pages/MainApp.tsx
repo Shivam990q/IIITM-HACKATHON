@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../components/auth/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoginForm from '../components/auth/LoginForm';
 import Header from '../components/layout/Header';
 import Dashboard from '../components/sections/Dashboard';
@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 const MainApp = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isRegister, setIsRegister] = useState(false);
   const { toast } = useToast();
@@ -27,7 +28,13 @@ const MainApp = () => {
 
     // If authentication completes and we have a user, they're logged in
     if (!loading && user) {
-      // Successful authentication
+      // Check if user is an admin and redirect to admin dashboard
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+        return;
+      }
+      
+      // Successful authentication for non-admin users
       toast({
         title: "Authentication successful",
         description: `Welcome back, ${user.name}!`,
@@ -51,10 +58,12 @@ const MainApp = () => {
   }
 
   if (!user) {
+    const role = searchParams.get('role') || 'citizen';
     return (
       <LoginForm 
         onToggleMode={() => setIsRegister(!isRegister)} 
-        isRegister={isRegister} 
+        isRegister={isRegister}
+        role={role as 'citizen' | 'admin'}
       />
     );
   }

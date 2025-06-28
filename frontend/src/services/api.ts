@@ -28,14 +28,17 @@ api.interceptors.response.use(
   (error) => {
     console.error('API Error:', error);
     
-    // Handle token expiration or invalid token
-    if (error.response?.status === 401) {
+    const { config, response } = error;
+    const originalRequestUrl = config.url;
+
+    // Handle token expiration or invalid token, but NOT for login attempts
+    if (response?.status === 401 && !originalRequestUrl.includes('/login')) {
+      console.log('Session expired or invalid. Logging out.');
       localStorage.removeItem('nyaychain_token');
       localStorage.removeItem('nyaychain_user');
-      // Redirect to login if not already there
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/';
-      }
+      
+      // Redirect to the home page, which will then handle routing to login
+      window.location.href = '/';
     }
     
     return Promise.reject(error);
@@ -278,6 +281,94 @@ export const statsService = {
       throw error.response?.data || { message: 'Failed to fetch map data' };
     }
   },
+};
+
+// Add admin-specific services
+export const adminService = {
+  login: async (email: string, password: string) => {
+    try {
+      const response = await api.post('/auth/admin/login', { email, password });
+      
+      // Store token and user data in localStorage on success
+      if (response.data.status === 'success') {
+        localStorage.setItem('nyaychain_token', response.data.token);
+        localStorage.setItem('nyaychain_user', JSON.stringify(response.data.data.user));
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('Admin login API error:', error);
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Admin login failed');
+      }
+      throw new Error('Network error during admin login');
+    }
+  },
+  
+  getStats: async () => {
+    try {
+      const response = await api.get('/stats/admin');
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to fetch admin statistics');
+      }
+      throw new Error('Network error while fetching admin statistics');
+    }
+  },
+  
+  getOfficials: async () => {
+    try {
+      const response = await api.get('/users/officials');
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to fetch officials');
+      }
+      throw new Error('Network error while fetching officials');
+    }
+  },
+  
+  createOfficial: async (officialData: any) => {
+    try {
+      const response = await api.post('/users/officials', officialData);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to create official');
+      }
+      throw new Error('Network error while creating official');
+    }
+  },
+  
+  updateComplaintStatus: async (complaintId: string, status: string, comment: string) => {
+    try {
+      const response = await api.patch(`/complaints/${complaintId}/status`, { 
+        status, 
+        comment 
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to update complaint status');
+      }
+      throw new Error('Network error while updating complaint status');
+    }
+  },
+  
+  assignComplaint: async (complaintId: string, officialId: string) => {
+    try {
+      const response = await api.patch(`/complaints/${complaintId}/assign`, { 
+        officialId 
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to assign complaint');
+      }
+      throw new Error('Network error while assigning complaint');
+    }
+  }
 };
 
 export default api; 

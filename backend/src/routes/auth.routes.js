@@ -5,7 +5,7 @@ const authMiddleware = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
-// Register route
+// Register a new user
 router.post(
   '/register',
   [
@@ -16,7 +16,7 @@ router.post(
   authController.register
 );
 
-// Login route
+// Login user
 router.post(
   '/login',
   [
@@ -26,7 +26,28 @@ router.post(
   authController.login
 );
 
+// Admin login
+router.post(
+  '/admin/login',
+  [
+    check('email', 'Please include a valid email').isEmail(),
+    check('password', 'Password is required').exists(),
+  ],
+  authController.adminLogin
+);
+
+// Create admin account (should be secured or disabled in production)
+router.post(
+  '/admin/create',
+  authMiddleware.protect,
+  authMiddleware.restrictTo('admin'),
+  authController.createAdmin
+);
+
 // Get current user
 router.get('/me', authMiddleware.protect, authController.getMe);
+
+// Logout user
+router.post('/logout', authController.logout);
 
 module.exports = router; 

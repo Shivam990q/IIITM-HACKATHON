@@ -31,10 +31,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user session
+    // This effect runs on mount and syncs user state from localStorage
     const storedUser = localStorage.getItem('nyaychain_user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+      } catch (error) {
+        console.error("Failed to parse user from localStorage", error);
+        // Clear corrupted data
+        localStorage.removeItem('nyaychain_user');
+        localStorage.removeItem('nyaychain_token');
+      }
     }
     setLoading(false);
   }, []);
@@ -45,18 +53,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authService.login(email, password);
       if (response.status === 'success') {
         setUser(response.data.user);
-        setLoading(false);
         return true;
-      } else {
-        console.error('Login failed:', response.message);
-        setLoading(false);
-        return false;
       }
+      return false;
     } catch (error: any) {
       console.error('Login error:', error);
-      setLoading(false);
-      // Show more specific error message if available
       throw new Error(error.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -66,24 +70,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authService.register(name, email, password);
       if (response.status === 'success') {
         setUser(response.data.user);
-        setLoading(false);
         return true;
-      } else {
-        console.error('Registration failed:', response.message);
-        setLoading(false);
-        return false;
       }
+      return false;
     } catch (error: any) {
       console.error('Registration error:', error);
-      setLoading(false);
-      // Show more specific error message if available
       throw new Error(error.message || 'Registration failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = () => {
     authService.logout();
     setUser(null);
+    // Redirect to home page after logout
+    window.location.href = '/';
   };
 
   return (

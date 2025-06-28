@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from './AuthContext';
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff, Mail, Lock, User, ArrowRight, ArrowLeft, Home } from 'lucide-react';
+import { Shield, Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginFormProps {
@@ -42,9 +42,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isRegister }) => {
           title: "Welcome to NyayChain! 🎉",
           description: `Successfully ${isRegister ? 'registered' : 'logged in'}. Let's build transparency together.`,
         });
-        // Navigate to main app immediately after successful authentication
         navigate('/app');
       } else {
+        // This case might not be hit if login throws an error, but it's a good fallback.
         toast({
           title: "Authentication Failed",
           description: "Please check your credentials and try again.",
@@ -55,7 +55,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isRegister }) => {
       console.error('Authentication error:', error);
       toast({
         title: "Authentication Failed",
-        description: error.message || "Please check your credentials and try again.",
+        description: error.message || "An unknown error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -96,7 +96,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isRegister }) => {
               <Shield className="h-8 w-8 text-white" />
             </div>
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-700 via-purple-600 to-emerald-600 bg-clip-text text-transparent">
-              {isRegister ? 'Join NyayChain' : 'Welcome Back'}
+              {isRegister ? 'Join NyayChain' : 'Welcome Back, Citizen'}
             </CardTitle>
             <CardDescription className="text-lg text-slate-600">
               {isRegister 

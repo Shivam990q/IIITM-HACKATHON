@@ -5,6 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/auth/AuthContext";
 import StatsSection from "@/components/StatsSection";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Shield, 
   Users, 
@@ -40,7 +46,11 @@ const Index = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/app');
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/app');
+      }
     }
 
     const handleScroll = () => {
@@ -148,20 +158,23 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <Button 
-                variant="ghost"
-                onClick={() => navigate('/app')}
-                className="hover:bg-blue-50 transition-colors"
-              >
-                Sign In
-              </Button>
-              <Button 
-                onClick={() => navigate('/app')}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-105"
-              >
-                Get Started
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-md shadow-blue-500/20 transition-all duration-300"
+                  >
+                    Sign In
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => navigate('/admin/login')}>
+                    Admin Login
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/app')}>
+                    Citizen Login
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
