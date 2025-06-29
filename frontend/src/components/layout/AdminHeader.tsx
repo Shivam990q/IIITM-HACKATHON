@@ -6,16 +6,17 @@ import {
   LogOut, 
   Home, 
   FileText, 
-  MapPin, 
-  BarChart3,
   Settings,
   Bell,
   Menu,
   Search,
-  HelpCircle
+  HelpCircle,
+  Users,
+  UserCheck,
+  ClipboardList
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,51 +29,41 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 
-interface HeaderProps {
+interface AdminHeaderProps {
   activeSection: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ activeSection }) => {
+const AdminHeader: React.FC<AdminHeaderProps> = ({ activeSection }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [searchActive, setSearchActive] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  
-  const navigationItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home, description: 'Overview & Stats', path: '/app/dashboard' },
-    { id: 'submit', label: 'Submit Issue', icon: FileText, description: 'Report Problem', path: '/app/submit' },
-    { id: 'map', label: 'Public Map', icon: MapPin, description: 'Community View', path: '/app/map' },
-    { id: 'profile', label: 'Profile', icon: Settings, description: 'Account Settings', path: '/app/profile' },
+  const [notificationsOpen, setNotificationsOpen] = useState(false);  const adminNavigationItems = [
+    { id: 'admin-dashboard', label: 'Dashboard', icon: Home, description: 'Admin Overview', path: '/app/admin/dashboard' },
+    { id: 'complaint-management', label: 'Complaints', icon: FileText, description: 'Manage Complaints', path: '/app/admin/complaints' },
+    { id: 'user-management', label: 'Users', icon: Users, description: 'User Management', path: '/app/admin/users' },
+    { id: 'admin-settings', label: 'Settings', icon: Settings, description: 'System Settings', path: '/app/admin/settings' },
   ];
 
-  const recentNotifications = [
-    { title: "New resolution update", desc: "Your complaint #NYC002 has been resolved", time: "10m ago", type: "success" },
-    { title: "Status change", desc: "Complaint #NYC003 changed to 'In Progress'", time: "1h ago", type: "update" },
-    { title: "Comment received", desc: "Municipal officer added a comment to your issue", time: "3h ago", type: "alert" },
+  const adminNotifications = [
+    { title: "Urgent complaint received", desc: "Water supply issue in Sector 12", time: "5m ago", type: "urgent" },
+    { title: "User verification pending", desc: "3 new user accounts need approval", time: "15m ago", type: "info" },
+    { title: "Monthly report ready", desc: "December complaint resolution summary", time: "1h ago", type: "success" },
+    { title: "System maintenance", desc: "Scheduled maintenance at 2 AM", time: "2h ago", type: "warning" },
   ];
-
-  const getNotificationStyle = (type: string) => {
-    switch(type) {
-      case "success": return "bg-green-100 text-green-700 border-green-300";
-      case "update": return "bg-blue-100 text-blue-700 border-blue-300";
-      case "alert": return "bg-amber-100 text-amber-700 border-amber-300";
-      default: return "bg-slate-100 text-slate-700 border-slate-300";
-    }
-  };
 
   return (
-    <header className="border-b bg-white/95 backdrop-blur-xl sticky top-0 z-50 shadow-md shadow-blue-500/5">
+    <header className="border-b bg-white/95 backdrop-blur-xl shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
-          {/* Enhanced interactive logo */}
+          {/* Enhanced interactive logo for Admin */}
           <motion.div 
             className="flex items-center space-x-4 cursor-pointer"
             whileHover={{ scale: 1.03 }}
-            onClick={() => navigate('/app/dashboard')}
+            onClick={() => navigate('/app/admin/dashboard')}
           >
             <div className="relative group">
               <motion.div 
-                className="w-12 h-12 bg-gradient-to-br from-blue-600 via-purple-600 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25"
+                className="w-12 h-12 bg-gradient-to-br from-green-600 via-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/25"
                 whileHover={{ rotate: [0, -10, 10, -10, 0], transition: { duration: 0.5 } }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -86,19 +77,19 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
               </div>
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-700 via-purple-600 to-emerald-600 bg-clip-text text-transparent">
-                NyayChain
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-green-700 via-blue-600 to-purple-600 bg-clip-text text-transparent">
+                NyayChain Admin
               </h1>
-              <p className="text-xs text-slate-500 font-medium">Blockchain Governance</p>
+              <p className="text-xs text-slate-500 font-medium">Administrative Panel</p>
             </div>
           </motion.div>
 
-          {/* Search bar - expands on click */}
+          {/* Search bar */}
           <div className={`hidden md:flex items-center transition-all duration-300 overflow-hidden ${searchActive ? 'w-64' : 'w-40'}`}>
             <div className="relative w-full">
               <Input 
-                className={`pl-9 py-1 h-8 bg-slate-50 border-slate-200 focus:border-blue-300 transition-all duration-300 ${searchActive ? 'pr-8' : ''}`}
-                placeholder="Search..." 
+                className={`pl-9 py-1 h-8 bg-slate-50 border-slate-200 focus:border-green-300 transition-all duration-300 ${searchActive ? 'pr-8' : ''}`}
+                placeholder="Search complaints, users..." 
                 onFocus={() => setSearchActive(true)}
                 onBlur={() => setSearchActive(false)}
               />
@@ -120,9 +111,9 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
             </div>
           </div>
 
-          {/* Enhanced Navigation */}
+          {/* Admin Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
-            {navigationItems.map((item) => {
+            {adminNavigationItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
               return (
@@ -136,8 +127,8 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
                     onClick={() => navigate(item.path)}
                     className={`relative flex items-center space-x-2 transition-all duration-300 ${
                       isActive 
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25' 
-                        : 'hover:bg-blue-50 hover:text-blue-700'
+                        ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white shadow-lg shadow-green-500/25' 
+                        : 'hover:bg-green-50 hover:text-green-700'
                     }`}
                     size="sm"
                   >
@@ -145,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
                     <span className="hidden lg:inline font-medium">{item.label}</span>
                     {isActive && (
                       <motion.div 
-                        layoutId="activeIndicator"
+                        layoutId="adminActiveIndicator"
                         className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full"
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
                       />
@@ -156,58 +147,65 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
             })}
           </nav>
 
-          {/* Enhanced User Menu */}
+          {/* Admin User Menu */}
           <div className="flex items-center space-x-4">
             {/* Help button */}
             <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-              <Button variant="ghost" size="sm" className="hidden sm:flex hover:bg-blue-50 hover:text-blue-700 transition-colors">
+              <Button variant="ghost" size="sm" className="hidden sm:flex hover:bg-green-50 hover:text-green-700 transition-colors">
                 <HelpCircle className="h-4 w-4" />
               </Button>
             </motion.div>
             
-            {/* Notifications */}
+            {/* Admin Notifications */}
             <div className="relative">
               <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
                 <DropdownMenuTrigger asChild>
                   <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-                    <Button variant="ghost" size="sm" className="relative hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                    <Button variant="ghost" size="sm" className="relative hover:bg-green-50 hover:text-green-700 transition-colors">
                       <Bell className="h-4 w-4" />
-                      {recentNotifications.length > 0 && (
-                        <Badge className="absolute -top-2 -right-2 w-5 h-5 text-xs p-0 flex items-center justify-center bg-gradient-to-r from-red-500 to-pink-500 border-2 border-white">
-                          {recentNotifications.length}
-                        </Badge>
+                      {adminNotifications.length > 0 && (
+                        <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
+                          {adminNotifications.length}
+                        </span>
                       )}
                     </Button>
                   </motion.div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80 bg-white/95 backdrop-blur-xl">
-                  <DropdownMenuLabel className="flex justify-between items-center">
-                    <span>Notifications</span>
-                    <Badge variant="outline" className="text-xs font-normal">
-                      {recentNotifications.length} new
+                  <DropdownMenuLabel className="flex items-center justify-between">
+                    <span>Admin Notifications</span>
+                    <Badge variant="secondary" className="bg-green-100 text-green-700">
+                      {adminNotifications.length} new
                     </Badge>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {recentNotifications.map((notification, index) => (
-                    <DropdownMenuItem key={index} className={`p-3 my-1 rounded-md ${getNotificationStyle(notification.type)} border`}>
-                      <div className="space-y-1">
-                        <p className="font-medium">{notification.title}</p>
-                        <p className="text-xs">{notification.desc}</p>
-                        <div className="flex justify-between items-center">
-                          <p className="text-xs opacity-70">{notification.time}</p>
+                  {adminNotifications.map((notification, index) => (
+                    <DropdownMenuItem key={index} className="py-3 focus:bg-green-50">
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-2 h-2 rounded-full mt-2 ${
+                          notification.type === 'urgent' ? 'bg-red-500' :
+                          notification.type === 'warning' ? 'bg-yellow-500' :
+                          notification.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                        }`} />
+                        <div className="flex-1">
+                          <p className="font-medium">{notification.title}</p>
+                          <p className="text-xs">{notification.desc}</p>
+                          <div className="flex justify-between items-center">
+                            <p className="text-xs opacity-70">{notification.time}</p>
+                          </div>
                         </div>
                       </div>
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-center text-blue-600 font-medium hover:text-blue-700 hover:bg-blue-50 cursor-pointer">
+                  <DropdownMenuItem className="text-center text-green-600 font-medium hover:text-green-700 hover:bg-green-50 cursor-pointer">
                     View all notifications
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
 
-            {/* Mobile Menu */}
+            {/* Mobile Menu for Admin */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild className="md:hidden">
                 <Button variant="ghost" size="sm">
@@ -215,15 +213,15 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Navigation</DropdownMenuLabel>
+                <DropdownMenuLabel>Admin Navigation</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {navigationItems.map((item) => {
+                {adminNavigationItems.map((item) => {
                   const Icon = item.icon;
                   return (
                     <DropdownMenuItem 
                       key={item.id}
                       onClick={() => navigate(item.path)}
-                      className={activeSection === item.id ? 'bg-blue-50 text-blue-600' : ''}
+                      className={activeSection === item.id ? 'bg-green-50 text-green-600' : ''}
                     >
                       <Icon className="mr-2 h-4 w-4" />
                       <div>
@@ -236,19 +234,17 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* User Profile */}
+            {/* Admin Profile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button variant="ghost" size="sm" className="flex items-center space-x-3 hover:bg-slate-100 transition-colors">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-                      <User className="h-5 w-5 text-white" />
+                  <Button variant="ghost" size="sm" className="flex items-center space-x-3 hover:bg-green-100 transition-colors">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 via-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
+                      <UserCheck className="h-5 w-5 text-white" />
                     </div>
                     <div className="hidden md:block text-left">
                       <p className="text-sm font-semibold text-slate-900">{user?.name}</p>
-                      <div className="flex items-center space-x-2">
-                        <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
-                      </div>
+                      <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
                     </div>
                   </Button>
                 </motion.div>
@@ -259,13 +255,9 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
                   <p className="text-xs text-slate-500">{user?.email}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate('/app/profile')}>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>My Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/app/settings')}>
+                <DropdownMenuItem onClick={() => navigate('/app/admin/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
+                  <span>Admin Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="text-red-600 hover:text-red-700 hover:bg-red-50 focus:bg-red-50 focus:text-red-700">
@@ -281,4 +273,4 @@ const Header: React.FC<HeaderProps> = ({ activeSection }) => {
   );
 };
 
-export default Header;
+export default AdminHeader;

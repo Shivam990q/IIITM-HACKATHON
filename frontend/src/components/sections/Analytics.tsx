@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,8 +18,43 @@ import {
   Cell
 } from 'recharts';
 import { TrendingUp, BarChart3, PieChart as PieChartIcon, Activity } from 'lucide-react';
+import { categoryService } from "@/services/api";
 
 const Analytics = () => {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<any[]>([]);
+
+  // Fetch categories and generate analytics data
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryService.getCategories();
+        const fetchedCategories = response.data.categories;
+        setCategories(fetchedCategories);
+        
+        // Generate dynamic category data for analytics
+        const dynamicCategoryData = fetchedCategories.map((category: any, index: number) => ({
+          name: category.name,
+          value: Math.floor(Math.random() * 40) + 5, // Random data for demo
+          color: category.color,
+        }));
+        setCategoryData(dynamicCategoryData);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        // Fallback to static data
+        setCategoryData([
+          { name: 'Road Issues', value: 35, color: '#8884d8' },
+          { name: 'Street Lights', value: 25, color: '#82ca9d' },
+          { name: 'Waste Management', value: 20, color: '#ffc658' },
+          { name: 'Water Supply', value: 15, color: '#ff7300' },
+          { name: 'Others', value: 5, color: '#00ff88' },
+        ]);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   const monthlyData = [
     { month: 'Jan', complaints: 45, resolved: 38, pending: 7 },
     { month: 'Feb', complaints: 52, resolved: 47, pending: 5 },
@@ -27,14 +62,6 @@ const Analytics = () => {
     { month: 'Apr', complaints: 61, resolved: 55, pending: 6 },
     { month: 'May', complaints: 55, resolved: 50, pending: 5 },
     { month: 'Jun', complaints: 67, resolved: 61, pending: 6 },
-  ];
-
-  const categoryData = [
-    { name: 'Road Issues', value: 35, color: '#8884d8' },
-    { name: 'Street Lights', value: 25, color: '#82ca9d' },
-    { name: 'Waste Management', value: 20, color: '#ffc658' },
-    { name: 'Water Supply', value: 15, color: '#ff7300' },
-    { name: 'Others', value: 5, color: '#00ff88' },
   ];
 
   const departmentPerformance = [

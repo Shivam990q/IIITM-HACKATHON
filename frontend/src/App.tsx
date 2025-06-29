@@ -3,43 +3,12 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./components/auth/AuthContext";
+import { AuthProvider } from "./components/auth/AuthContext";
 import Index from "./pages/Index";
 import MainApp from "./pages/MainApp";
 import NotFound from "./pages/NotFound";
-import AdminLoginForm from "./components/admin/AdminLoginForm";
-import AdminLayout from "./components/admin/AdminLayout";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import ComplaintManagement from "./pages/admin/ComplaintManagement";
-import OfficialManagement from "./pages/admin/OfficialManagement";
-import AdminProfile from "./pages/admin/AdminProfile";
-import AdminAnalytics from "./pages/admin/AdminAnalytics";
-import React from "react";
 
 const queryClient = new QueryClient();
-
-// Protected route component for admin routes
-interface AdminRouteProps {
-  children: React.ReactNode;
-}
-
-const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-  
-  if (!user || user.role !== 'admin') {
-    return <Navigate to="/admin/login" replace />;
-  }
-  
-  return <>{children}</>;
-};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -50,22 +19,21 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            
+            {/* App Routes - MainApp handles authentication and routing */}
             <Route path="/app" element={<MainApp />} />
+            <Route path="/app/dashboard" element={<MainApp />} />
+            <Route path="/app/submit" element={<MainApp />} />
+            <Route path="/app/map" element={<MainApp />} />
+            <Route path="/app/settings" element={<MainApp />} />
+            <Route path="/app/profile" element={<MainApp />} />
             
             {/* Admin Routes */}
-            <Route path="/admin/login" element={<AdminLoginForm />} />
-            <Route path="/admin" element={
-              <AdminRoute>
-                <AdminLayout />
-              </AdminRoute>
-            }>
-              <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="complaints" element={<ComplaintManagement />} />
-              <Route path="officials" element={<OfficialManagement />} />
-              <Route path="analytics" element={<AdminAnalytics />} />
-              <Route path="profile" element={<AdminProfile />} />
-              <Route index element={<AdminDashboard />} />
-            </Route>
+            <Route path="/app/admin" element={<Navigate to="/app/admin/dashboard" replace />} />
+            <Route path="/app/admin/dashboard" element={<MainApp />} />
+            <Route path="/app/admin/complaints" element={<MainApp />} />
+            <Route path="/app/admin/users" element={<MainApp />} />
+            <Route path="/app/admin/settings" element={<MainApp />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

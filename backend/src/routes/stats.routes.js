@@ -8,5 +8,6 @@ router.get('/summary', statsController.getSummaryStats);
 router.get('/by-category', statsController.getStatsByCategory);
 router.get('/time-series', statsController.getTimeSeriesData);
 router.get('/map-data', statsController.getMapData);
+router.get('/public/live', statsController.getPublicLiveStats);
 
 module.exports = router; 

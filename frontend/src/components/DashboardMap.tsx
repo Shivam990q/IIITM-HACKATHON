@@ -5,69 +5,115 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Clock, Eye, Filter, Search, TrendingUp } from "lucide-react";
-
-// Mock complaint data
-const mockComplaints = [
-  {
-    id: "NYC-1703847234567",
-    title: "Pothole on MG Road",
-    category: "Road & Infrastructure",
-    status: "In Progress",
-    location: "MG Road, Bengaluru",
-    coordinates: { lat: 12.9716, lng: 77.5946 },
-    timestamp: "2024-01-15T10:30:00Z",
-    description: "Large pothole causing traffic issues and vehicle damage",
-    department: "BBMP Road Maintenance",
-    estimatedResolution: "7 days",
-    priority: "High"
-  },
-  {
-    id: "NYC-1703847234568",
-    title: "Broken Street Light",
-    category: "Street Lighting",
-    status: "Acknowledged",
-    location: "Brigade Road, Bengaluru",
-    coordinates: { lat: 12.9698, lng: 77.6205 },
-    timestamp: "2024-01-14T14:20:00Z",
-    description: "Street light not functioning for past week",
-    department: "BESCOM",
-    estimatedResolution: "3 days",
-    priority: "Medium"
-  },
-  {
-    id: "NYC-1703847234569",
-    title: "Garbage Collection Missed",
-    category: "Waste Management",
-    status: "Resolved",
-    location: "Koramangala, Bengaluru",
-    coordinates: { lat: 12.9352, lng: 77.6245 },
-    timestamp: "2024-01-13T08:15:00Z",
-    description: "Garbage not collected for 3 days in residential area",
-    department: "BBMP Waste Management",
-    estimatedResolution: "Completed",
-    priority: "High"
-  },
-  {
-    id: "NYC-1703847234570",
-    title: "Water Supply Disruption",
-    category: "Water Supply",
-    status: "Under Review",
-    location: "Whitefield, Bengaluru",
-    coordinates: { lat: 12.9698, lng: 77.7500 },
-    timestamp: "2024-01-16T06:45:00Z",
-    description: "No water supply for entire apartment complex",
-    department: "BWSSB",
-    estimatedResolution: "5 days",
-    priority: "High"
-  }
-];
+import { MapPin, Clock, Eye, Filter, Search, TrendingUp, RefreshCw } from "lucide-react";
+import { categoryService, complaintService } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const DashboardMap = () => {
-  const [complaints, setComplaints] = useState(mockComplaints);
+  const [complaints, setComplaints] = useState<any[]>([]);
   const [selectedComplaint, setSelectedComplaint] = useState<any>(null);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast } = useToast();
+
+  // Fetch categories and complaints on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      await Promise.all([fetchCategories(), fetchComplaints()]);
+    };
+    fetchData();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await categoryService.getCategories();
+      setCategories(response.data.categories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchComplaints = async () => {
+    try {
+      setLoading(true);
+      // Fetch all complaints - this is now public and shows all citizen complaints
+      const response = await complaintService.getComplaints({ 
+        limit: 100, // Get more complaints for the map
+        sort: '-createdAt' 
+      });
+      
+      // Transform the data to match our component structure
+      const transformedComplaints = response.data.complaints.map((complaint: any) => ({
+        id: complaint._id,
+        title: complaint.title,
+        category: complaint.category?.name || 'General',
+        status: mapStatusToDisplay(complaint.status),
+        location: complaint.location?.address || 'Location not specified',
+        coordinates: { 
+          lat: complaint.location?.coordinates?.[1] || 26.2124, 
+          lng: complaint.location?.coordinates?.[0] || 78.1772 
+        },
+        timestamp: complaint.createdAt,
+        description: complaint.description,
+        department: complaint.department || getDepartmentFromCategory(complaint.category?.name),
+        estimatedResolution: getEstimatedResolution(complaint.status),
+        priority: complaint.priority || 'Medium',
+        upvotes: complaint.upvotes?.length || 0,
+        submittedBy: complaint.submittedBy?.name || 'Anonymous'
+      }));
+      
+      setComplaints(transformedComplaints);
+    } catch (error: any) {
+      console.error('Error fetching complaints:', error);
+      toast({
+        title: "Error loading complaints",
+        description: "Could not load the latest complaints. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchComplaints();
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
+
+  // Helper functions
+  const mapStatusToDisplay = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      'pending': 'Under Review',
+      'acknowledged': 'Acknowledged', 
+      'in_progress': 'In Progress',
+      'resolved': 'Resolved',
+      'rejected': 'Rejected'
+    };
+    return statusMap[status] || status;
+  };
+
+  const getDepartmentFromCategory = (category: string) => {
+    const departmentMap: { [key: string]: string } = {
+      'Road & Infrastructure': 'Gwalior Municipal Corporation',
+      'Street Lighting': 'MP Madhya Kshetra Vidyut Vitaran',
+      'Waste Management': 'Gwalior Municipal Corporation Waste Management',
+      'Water Supply': 'Gwalior Jal Nigam',
+      'Traffic': 'Gwalior Traffic Police',
+      'Health': 'Gwalior Health Department'
+    };
+    return departmentMap[category] || 'Municipal Corporation';
+  };
+
+  const getEstimatedResolution = (status: string) => {
+    if (status === 'resolved') return 'Completed';
+    if (status === 'in_progress') return '2-5 days';
+    if (status === 'acknowledged') return '3-7 days';
+    return '5-10 days';
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -101,7 +147,7 @@ const DashboardMap = () => {
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold mb-4">Public Accountability Dashboard</h2>
         <p className="text-gray-600">
-          Real-time transparency into civic complaints and their resolution status
+          Real-time transparency into all civic complaints from citizens across the city
         </p>
         <div className="flex justify-center mt-4 space-x-2">
           <Badge className="bg-green-100 text-green-700">
@@ -110,16 +156,72 @@ const DashboardMap = () => {
           <Badge className="bg-blue-100 text-blue-700">
             👁️ Publicly Verifiable
           </Badge>
+          <Badge className="bg-purple-100 text-purple-700">
+            🌐 All Citizens' Issues
+          </Badge>
         </div>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-blue-600">{filteredComplaints.length}</p>
+              <p className="text-sm text-gray-600">Total Issues</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-600">
+                {filteredComplaints.filter(c => c.status === 'Resolved').length}
+              </p>
+              <p className="text-sm text-gray-600">Resolved</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-yellow-600">
+                {filteredComplaints.filter(c => c.status === 'In Progress').length}
+              </p>
+              <p className="text-sm text-gray-600">In Progress</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-red-600">
+                {filteredComplaints.filter(c => c.status === 'Under Review').length}
+              </p>
+              <p className="text-sm text-gray-600">Pending</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters and Search */}
       <Card className="civic-card mb-6">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filter & Search</span>
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filter & Search</span>
+            </CardTitle>
+            <Button 
+              onClick={handleRefresh} 
+              disabled={isRefreshing || loading}
+              variant="outline" 
+              size="sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4">
@@ -150,9 +252,17 @@ const DashboardMap = () => {
         </CardContent>
       </Card>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Map Placeholder */}
-        <div className="lg:col-span-2">
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading all citizen complaints...</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Map Placeholder */}
+          <div className="lg:col-span-2">
           <Card className="civic-card">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -165,35 +275,86 @@ const DashboardMap = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-96 bg-gradient-to-br from-blue-100 to-green-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center relative overflow-hidden">
-                {/* Map pins simulation */}
-                <div className="absolute inset-0 p-4">
-                  {filteredComplaints.map((complaint, index) => (
-                    <div 
-                      key={complaint.id}
-                      className={`absolute w-4 h-4 rounded-full cursor-pointer transform hover:scale-150 transition-all duration-200 ${
-                        complaint.status === 'Resolved' ? 'bg-green-500' :
-                        complaint.status === 'In Progress' ? 'bg-blue-500' :
-                        complaint.status === 'Acknowledged' ? 'bg-yellow-500' :
-                        'bg-purple-500'
-                      }`}
-                      style={{
-                        left: `${20 + (index * 15) % 60}%`,
-                        top: `${20 + (index * 20) % 60}%`
-                      }}
-                      onClick={() => setSelectedComplaint(complaint)}
-                      title={complaint.title}
-                    />
-                  ))}
+              {/* Google Maps Embed with Complaint Pins Overlay */}
+              <div className="h-96 rounded-lg border relative overflow-hidden">
+                {/* Google Maps Iframe */}
+                <iframe 
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d114542.80185929636!2d78.19089894999999!3d26.21415585!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3976c5d1792291fb%3A0xff4fb56d65bc3adf!2sGwalior%2C%20Madhya%20Pradesh!5e0!3m2!1sen!2sin!4v1751120764070!5m2!1sen!2sin" 
+                  width="100%" 
+                  height="100%" 
+                  style={{ border: 0 }} 
+                  allowFullScreen={true}
+                  loading="lazy" 
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="rounded-lg"
+                />
+
+                {/* Complaint Pins Overlay */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {filteredComplaints.map((complaint, index) => {
+                    const getStatusPinColor = (status: string) => {
+                      switch (status) {
+                        case 'Resolved': return 'bg-green-500 border-green-600 shadow-green-300';
+                        case 'In Progress': return 'bg-blue-500 border-blue-600 shadow-blue-300';
+                        case 'Acknowledged': return 'bg-yellow-500 border-yellow-600 shadow-yellow-300';
+                        case 'Under Review': return 'bg-purple-500 border-purple-600 shadow-purple-300';
+                        default: return 'bg-gray-500 border-gray-600 shadow-gray-300';
+                      }
+                    };
+
+                    // Position pins across Gwalior city (approximate locations)
+                    const positions = [
+                      { left: '45%', top: '35%' }, // Central Gwalior (MG Road area)
+                      { left: '55%', top: '45%' }, // Lashkar area
+                      { left: '35%', top: '55%' }, // Morar area
+                      { left: '65%', top: '25%' }, // Thatipur area
+                    ];
+                    const position = positions[index % positions.length];
+
+                    return (
+                      <div
+                        key={complaint.id}
+                        className={`absolute w-6 h-6 rounded-full cursor-pointer transform hover:scale-125 transition-all duration-200 border-2 ${getStatusPinColor(complaint.status)} shadow-lg flex items-center justify-center pointer-events-auto z-10`}
+                        style={position}
+                        onClick={() => setSelectedComplaint(complaint)}
+                        title={`${complaint.title} - ${complaint.status}`}
+                      >
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                        {/* Pin tooltip on hover */}
+                        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow-lg text-xs font-medium text-gray-800 opacity-0 hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                          {complaint.title}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="text-center text-gray-600">
-                  <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-lg font-semibold">Interactive Map View</p>
-                  <p className="text-sm">Click on pins to view complaint details</p>
-                  <p className="text-xs mt-2 text-gray-500">
-                    🟢 Resolved | 🔵 In Progress | 🟡 Acknowledged | 🟣 Under Review
-                  </p>
+
+                {/* Map Legend Overlay */}
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg z-20">
+                  <p className="text-xs font-semibold text-gray-800 mb-2">Gwalior Complaints Map</p>
+                  <p className="text-xs text-gray-600">Click pins for details</p>
                 </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-center text-xs text-gray-500">
+                <span className="flex items-center gap-4">
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-green-500 rounded-full border border-green-600"></div>
+                    Resolved
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full border border-blue-600"></div>
+                    In Progress
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full border border-yellow-600"></div>
+                    Acknowledged
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full border border-purple-600"></div>
+                    Under Review
+                  </span>
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -266,6 +427,7 @@ const DashboardMap = () => {
           </Card>
         </div>
       </div>
+      )}
 
       {/* Complaints List */}
       <div className="mt-8">

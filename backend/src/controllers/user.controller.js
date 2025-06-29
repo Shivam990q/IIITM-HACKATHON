@@ -56,6 +56,7 @@ exports.updateProfile = async (req, res) => {
           address: user.address,
           bio: user.bio,
           profileImage: user.profileImage,
+          createdAt: user.createdAt,
           updatedAt: user.updatedAt,
         },
       },
@@ -242,4 +243,88 @@ exports.createOfficial = async (req, res) => {
       message: 'Server error while creating official account',
     });
   }
-}; 
+};
+
+/**
+ * Get user statistics
+ * @route GET /api/users/stats
+ * @access Private
+ */
+exports.getUserStats = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const Complaint = require('../models/complaint.model');
+
+    // Get user complaints stats
+    const [complaintsSubmitted, issuesResolved, inProgress, pending] = await Promise.all([
+      Complaint.countDocuments({ submittedBy: userId }),
+      Complaint.countDocuments({ submittedBy: userId, status: 'resolved' }),
+      Complaint.countDocuments({ submittedBy: userId, status: 'in_progress' }),
+      Complaint.countDocuments({ submittedBy: userId, status: 'pending' })
+    ]);
+
+    // Calculate days active (since user registration)
+    const daysActive = Math.floor((Date.now() - req.user.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Calculate average response time (from submission to first acknowledgment)
+    let avgResponseTime = 0;
+    const userComplaints = await Complaint.find({ 
+      submittedBy: userId,
+      statusUpdates: { $exists: true, $not: { $size: 0 } }
+    });
+
+    if (userComplaints.length > 0) {
+      let totalResponseTime = 0;
+      let respondedComplaints = 0;
+
+      userComplaints.forEach(complaint => {
+        // Find the first status update that indicates response (acknowledged, in_progress, or resolved)
+        const firstResponse = complaint.statusUpdates.find(update => 
+          ['acknowledged', 'in_progress', 'resolved'].includes(update.status)
+        );
+        
+        if (firstResponse) {
+          const responseTime = (firstResponse.createdAt - complaint.createdAt) / (1000 * 60 * 60); // Convert to hours
+          totalResponseTime += responseTime;
+          respondedComplaints++;
+        }
+      });
+
+      if (respondedComplaints > 0) {
+        avgResponseTime = Math.round(totalResponseTime / respondedComplaints);
+      }
+    }
+
+    // Calculate community impact score based on resolved issues and activity
+    const resolutionRate = complaintsSubmitted > 0 ? (issuesResolved / complaintsSubmitted) * 100 : 0;
+    const communityImpactScore = Math.min(100, Math.floor(resolutionRate * 0.7 + (daysActive / 365) * 30));
+
+    // Get recent activity
+    const recentComplaints = await Complaint.find({ submittedBy: userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('title status createdAt')
+      .populate('category', 'name');
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        complaintsSubmitted,
+        issuesResolved,
+        inProgress,
+        pending,
+        daysActive,
+        avgResponseTime,
+        communityImpactScore: Math.round(communityImpactScore),
+        resolutionRate: Math.round(resolutionRate),
+        recentComplaints
+      },
+    });
+  } catch (error) {
+    console.error('Get user stats error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error while fetching user statistics',
+    });
+  }
+};

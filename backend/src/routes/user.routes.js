@@ -17,6 +17,8 @@ router.patch(
 
 router.get('/complaints', authMiddleware.protect, userController.getUserComplaints);
 
+router.get('/stats', authMiddleware.protect, userController.getUserStats);
+
 router.patch(
   '/password',
   authMiddleware.protect,
@@ -52,4 +54,4 @@ router.post(
   userController.createOfficial
 );
 
-module.exports = router; 
+module.exports = router;

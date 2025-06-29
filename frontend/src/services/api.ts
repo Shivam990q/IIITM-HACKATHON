@@ -28,17 +28,14 @@ api.interceptors.response.use(
   (error) => {
     console.error('API Error:', error);
     
-    const { config, response } = error;
-    const originalRequestUrl = config.url;
-
-    // Handle token expiration or invalid token, but NOT for login attempts
-    if (response?.status === 401 && !originalRequestUrl.includes('/login')) {
-      console.log('Session expired or invalid. Logging out.');
+    // Handle token expiration or invalid token
+    if (error.response?.status === 401) {
       localStorage.removeItem('nyaychain_token');
       localStorage.removeItem('nyaychain_user');
-      
-      // Redirect to the home page, which will then handle routing to login
-      window.location.href = '/';
+      // Redirect to login if not already there
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/';
+      }
     }
     
     return Promise.reject(error);
@@ -52,9 +49,9 @@ export const authService = {
   /**
    * Register a new user
    */
-  register: async (name: string, email: string, password: string) => {
+  register: async (name: string, email: string, password: string, role: 'citizen' | 'admin' = 'citizen') => {
     try {
-      const response = await api.post('/auth/register', { name, email, password });
+      const response = await api.post('/auth/register', { name, email, password, role });
       if (response.data.status === 'success') {
         localStorage.setItem('nyaychain_token', response.data.token);
         localStorage.setItem('nyaychain_user', JSON.stringify(response.data.data.user));
@@ -68,9 +65,9 @@ export const authService = {
   /**
    * Login user
    */
-  login: async (email: string, password: string) => {
+  login: async (email: string, password: string, role: 'citizen' | 'admin' = 'citizen') => {
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password, role });
       if (response.data.status === 'success') {
         localStorage.setItem('nyaychain_token', response.data.token);
         localStorage.setItem('nyaychain_user', JSON.stringify(response.data.data.user));
@@ -227,6 +224,18 @@ export const userService = {
       throw error.response?.data || { message: 'Failed to change password' };
     }
   },
+
+  /**
+   * Get user statistics
+   */
+  getUserStats: async () => {
+    try {
+      const response = await api.get('/users/stats');
+      return response.data.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch user statistics' };
+    }
+  },
 };
 
 /**
@@ -281,94 +290,222 @@ export const statsService = {
       throw error.response?.data || { message: 'Failed to fetch map data' };
     }
   },
+
+  /**
+   * Get public live statistics (no authentication required)
+   */
+  getPublicLiveStats: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/stats/public/live`);
+      return response.data.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to fetch live statistics' };
+    }
+  },
 };
 
-// Add admin-specific services
+/**
+ * Admin API endpoints
+ */
 export const adminService = {
-  login: async (email: string, password: string) => {
+  /**
+   * Get admin dashboard statistics
+   */
+  getDashboardStats: async () => {
     try {
-      const response = await api.post('/auth/admin/login', { email, password });
-      
-      // Store token and user data in localStorage on success
-      if (response.data.status === 'success') {
-        localStorage.setItem('nyaychain_token', response.data.token);
-        localStorage.setItem('nyaychain_user', JSON.stringify(response.data.data.user));
-      }
-      
-      return response.data;
+      const response = await api.get('/admin/stats');
+      return response.data.data;
     } catch (error: any) {
-      console.error('Admin login API error:', error);
-      if (error.response) {
-        throw new Error(error.response.data.message || 'Admin login failed');
-      }
-      throw new Error('Network error during admin login');
+      throw error.response?.data || { message: 'Failed to fetch admin statistics' };
     }
   },
-  
-  getStats: async () => {
+
+  /**
+   * Get all users (admin view)
+   */
+  getAllUsers: async (filters?: { role?: string; page?: number; limit?: number }) => {
     try {
-      const response = await api.get('/stats/admin');
-      return response.data;
+      const response = await api.get('/admin/users', { params: filters });
+      return response.data.data;
     } catch (error: any) {
-      if (error.response) {
-        throw new Error(error.response.data.message || 'Failed to fetch admin statistics');
-      }
-      throw new Error('Network error while fetching admin statistics');
+      throw error.response?.data || { message: 'Failed to fetch users' };
     }
   },
-  
-  getOfficials: async () => {
+
+  /**
+   * Get all complaints (admin view)
+   */
+  getAllComplaints: async (filters?: { status?: string; page?: number; limit?: number }) => {
     try {
-      const response = await api.get('/users/officials');
-      return response.data;
+      const response = await api.get('/admin/complaints', { params: filters });
+      return response.data.data;
     } catch (error: any) {
-      if (error.response) {
-        throw new Error(error.response.data.message || 'Failed to fetch officials');
-      }
-      throw new Error('Network error while fetching officials');
+      throw error.response?.data || { message: 'Failed to fetch complaints' };
     }
   },
-  
-  createOfficial: async (officialData: any) => {
+
+  /**
+   * Get complaint details (admin view)
+   */
+  getComplaintDetails: async (complaintId: string) => {
     try {
-      const response = await api.post('/users/officials', officialData);
-      return response.data;
+      const response = await api.get(`/admin/complaints/${complaintId}`);
+      return response.data.data.complaint;
     } catch (error: any) {
-      if (error.response) {
-        throw new Error(error.response.data.message || 'Failed to create official');
-      }
-      throw new Error('Network error while creating official');
+      throw error.response?.data || { message: 'Failed to fetch complaint details' };
     }
   },
-  
-  updateComplaintStatus: async (complaintId: string, status: string, comment: string) => {
+
+  /**
+   * Assign complaint to official/department
+   */
+  assignComplaint: async (complaintId: string, data: { 
+    officialId?: string; 
+    department: string; 
+    priority?: string; 
+    note?: string; 
+  }) => {
     try {
-      const response = await api.patch(`/complaints/${complaintId}/status`, { 
-        status, 
-        comment 
-      });
-      return response.data;
+      const response = await api.patch(`/admin/complaints/${complaintId}/assign`, data);
+      return response.data.data.complaint;
     } catch (error: any) {
-      if (error.response) {
-        throw new Error(error.response.data.message || 'Failed to update complaint status');
-      }
-      throw new Error('Network error while updating complaint status');
+      throw error.response?.data || { message: 'Failed to assign complaint' };
     }
   },
-  
-  assignComplaint: async (complaintId: string, officialId: string) => {
+
+  /**
+   * Update complaint status
+   */
+  updateComplaintStatus: async (complaintId: string, data: { 
+    status: string; 
+    note?: string; 
+  }) => {
     try {
-      const response = await api.patch(`/complaints/${complaintId}/assign`, { 
-        officialId 
-      });
+      const response = await api.patch(`/admin/complaints/${complaintId}/status`, data);
+      return response.data.data.complaint;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to update complaint status' };
+    }
+  },
+
+  /**
+   * Update user role and permissions
+   */
+  updateUserRole: async (userId: string, data: { role: string; permissions?: string[] }) => {
+    try {
+      const response = await api.put(`/admin/users/${userId}/role`, data);
+      return response.data.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to update user role' };
+    }
+  },
+
+  /**
+   * Delete user
+   */
+  deleteUser: async (userId: string) => {
+    try {
+      const response = await api.delete(`/admin/users/${userId}`);
       return response.data;
     } catch (error: any) {
-      if (error.response) {
-        throw new Error(error.response.data.message || 'Failed to assign complaint');
-      }
-      throw new Error('Network error while assigning complaint');
+      throw error.response?.data || { message: 'Failed to delete user' };
     }
-  }
+  },
 };
 
-export default api; 
+/**
+ * Category Services
+ */
+export const categoryService = {
+  /**
+   * Get all active categories
+   */
+  getCategories: async () => {
+    try {
+      const response = await api.get('/categories');
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to fetch categories' };
+    }
+  },
+
+  /**
+   * Get all categories (including inactive) - Admin only
+   */
+  getAllCategories: async () => {
+    try {
+      const response = await api.get('/categories/all');
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to fetch all categories' };
+    }
+  },
+
+  /**
+   * Create a new category - Admin only
+   */
+  createCategory: async (categoryData: {
+    name: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    order?: number;
+  }) => {
+    try {
+      const response = await api.post('/categories', categoryData);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to create category' };
+    }
+  },
+
+  /**
+   * Update a category - Admin only
+   */
+  updateCategory: async (categoryId: string, categoryData: any) => {
+    try {
+      const response = await api.patch(`/categories/${categoryId}`, categoryData);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to update category' };
+    }
+  },
+
+  /**
+   * Delete a category - Admin only
+   */
+  deleteCategory: async (categoryId: string) => {
+    try {
+      const response = await api.delete(`/categories/${categoryId}`);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to delete category' };
+    }
+  },
+
+  /**
+   * Toggle category status - Admin only
+   */
+  toggleCategoryStatus: async (categoryId: string) => {
+    try {
+      const response = await api.patch(`/categories/${categoryId}/toggle`);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to toggle category status' };
+    }
+  },
+
+  /**
+   * Reorder categories - Admin only
+   */
+  reorderCategories: async (categories: { id: string; order: number }[]) => {
+    try {
+      const response = await api.patch('/categories/reorder', { categories });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { message: 'Failed to reorder categories' };
+    }
+  },
+};
+
+export default api;

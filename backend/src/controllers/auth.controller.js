@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const User = require('../models/user.model');
-const bcrypt = require('bcryptjs');
 
 /**
  * Generate JWT Token
@@ -30,11 +29,19 @@ exports.register = async (req, res) => {
       });
     }
 
-    const { name, email, password } = req.body;
-    const normalizedEmail = email.toLowerCase().trim();
+    const { name, email, password, role = 'citizen' } = req.body;
+
+    // Validate role
+    const validRoles = ['citizen', 'admin'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Invalid role. Must be either citizen or admin',
+      });
+    }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email: normalizedEmail });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
         status: 'fail',
@@ -42,13 +49,32 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create user
-    const user = await User.create({
+    // Create user with role-specific metadata
+    const userData = {
       name,
-      email: normalizedEmail,
+      email,
       password,
-      role: 'citizen', // Default role
-    });
+      role,
+      roleMetadata: {}
+    };
+
+    // Set role-specific permissions and metadata
+    if (role === 'admin') {
+      userData.roleMetadata = {
+        adminLevel: 'local_admin',
+        department: '',
+        jurisdiction: '',
+        permissions: ['read', 'write', 'delete', 'manage_complaints', 'view_analytics']
+      };
+    } else if (role === 'citizen') {
+      userData.roleMetadata = {
+        citizenId: '',
+        verificationStatus: 'pending',
+        permissions: ['read', 'write']
+      };
+    }
+
+    const user = await User.create(userData);
 
     // Generate token
     const token = generateToken(user._id);
@@ -86,16 +112,14 @@ exports.login = async (req, res) => {
     if (!errors.isEmpty()) {
       return res.status(400).json({ 
         status: 'fail',
-        message: 'Invalid input data.',
         errors: errors.array() 
       });
     }
 
-    const { email, password } = req.body;
-    const normalizedEmail = email.toLowerCase().trim();
+    const { email, password, role } = req.body;
 
     // Find user and include password for verification
-    const user = await User.findOne({ email: normalizedEmail }).select('+password');
+    const user = await User.findOne({ email }).select('+password');
 
     // Check if user exists and password is correct
     if (!user || !(await user.matchPassword(password))) {
@@ -105,11 +129,11 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Don't allow admins to log in through the general login route
-    if (user.role === 'admin') {
+    // If role is provided, verify it matches the user's role
+    if (role && user.role !== role) {
       return res.status(403).json({
         status: 'fail',
-        message: 'Admin login prohibited through this route. Please use /api/auth/admin/login.',
+        message: `Access denied. User is not authorized as ${role}`,
       });
     }
 
@@ -120,14 +144,16 @@ exports.login = async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
-    // Remove password from user object before sending
-    user.password = undefined;
-
     res.status(200).json({
       status: 'success',
       token,
       data: {
-        user,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
       },
     });
   } catch (error) {
@@ -172,110 +198,4 @@ exports.getMe = async (req, res) => {
       message: 'Server error while fetching user details',
     });
   }
-};
-
-// Add admin login endpoint
-exports.adminLogin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    // Basic validation
-    if (!email || !password) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Please provide email and password'
-      });
-    }
-    
-    // Find user with admin role
-    const admin = await User.findOne({ email, role: 'admin' }).select('+password');
-    
-    if (!admin || !(await admin.matchPassword(password))) {
-      return res.status(401).json({
-        status: 'fail',
-        message: 'Invalid credentials for administrator'
-      });
-    }
-    
-    // Update last login
-    admin.lastLogin = Date.now();
-    await admin.save({ validateBeforeSave: false });
-    
-    // Generate JWT token using the helper function
-    const token = generateToken(admin._id);
-    
-    // Remove password from admin object before sending
-    admin.password = undefined;
-    
-    return res.status(200).json({
-      status: 'success',
-      token,
-      data: {
-        user: admin,
-      }
-    });
-  } catch (error) {
-    console.error('Admin login error:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Server error during admin login'
-    });
-  }
-};
-
-// Add function to create admin account (for initial setup)
-exports.createAdmin = async (req, res) => {
-  try {
-    // This endpoint should be secured or disabled in production
-    // Check if admin already exists
-    const adminExists = await User.findOne({ role: 'admin' });
-    
-    if (adminExists) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Admin account already exists'
-      });
-    }
-    
-    // Create admin account
-    const admin = new User({
-      name: 'System Administrator',
-      email: 'admin@nyaychain.com',
-      password: await bcrypt.hash('admin123', 10), // Use a secure password in production
-      role: 'admin'
-    });
-    
-    await admin.save();
-    
-    return res.status(201).json({
-      status: 'success',
-      message: 'Admin account created successfully',
-      data: {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role
-      }
-    });
-  } catch (error) {
-    console.error('Create admin error:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Server error during admin creation'
-    });
-  }
-};
-
-/**
- * Logout user
- * @route POST /api/auth/logout
- * @access Public
- */
-exports.logout = (req, res) => {
-  // On the client-side, the token should be removed.
-  // This endpoint is for acknowledging the logout action.
-  res.status(200).json({ 
-    status: 'success', 
-    message: 'User logged out successfully' 
-  });
 }; 

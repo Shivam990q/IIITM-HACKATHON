@@ -50,20 +50,9 @@ const complaintSchema = new mongoose.Schema(
       required: [true, 'Description is required'],
     },
     category: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
       required: [true, 'Category is required'],
-      enum: [
-        'Road & Infrastructure',
-        'Water Supply',
-        'Electricity',
-        'Waste Management',
-        'Street Lighting',
-        'Public Safety',
-        'Parks & Recreation',
-        'Traffic & Transportation',
-        'Healthcare',
-        'Education',
-      ],
     },
     location: {
       type: {

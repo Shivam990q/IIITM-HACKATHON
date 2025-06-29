@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Upload, Send, Clock, CheckCircle, AlertCircle, Camera, Trash2, FileText } from "lucide-react";
+import { MapPin, Upload, Send, Clock, CheckCircle, AlertCircle, Camera, Trash2, FileText, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { complaintService } from "@/services/api";
+import { complaintService, categoryService } from "@/services/api";
 import { useAuth } from "@/components/auth/AuthContext";
 
 const ComplaintForm = () => {
@@ -28,20 +28,31 @@ const ComplaintForm = () => {
   const [submitProgress, setSubmitProgress] = useState(0);
   const [activeTab, setActiveTab] = useState("details");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const categories = [
-    "Road & Infrastructure",
-    "Water Supply",
-    "Electricity",
-    "Waste Management",
-    "Street Lighting",
-    "Public Safety",
-    "Parks & Recreation",
-    "Traffic & Transportation",
-    "Healthcare",
-    "Education"
-  ];
+  // Fetch categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const response = await categoryService.getCategories();
+        setCategories(response.data.categories);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        toast({
+          title: "Error loading categories",
+          description: "Could not load complaint categories. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, [toast]);
 
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -283,18 +294,48 @@ const ComplaintForm = () => {
                     
                     <div className="space-y-2">
                       <Label htmlFor="category">Category *</Label>
-                      <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                      <Select 
+                        value={formData.category} 
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                        disabled={categoriesLoading}
+                      >
                         <SelectTrigger className="focus:ring-blue-500">
-                          <SelectValue placeholder="Select category" />
+                          <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select category"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category} value={category} className="focus:bg-blue-50 focus:text-blue-700">
-                              {category}
-                            </SelectItem>
-                          ))}
+                          {categoriesLoading ? (
+                            <div className="flex items-center justify-center p-4">
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              <span className="text-sm text-gray-500">Loading categories...</span>
+                            </div>
+                          ) : categories.length === 0 ? (
+                            <div className="flex items-center justify-center p-4">
+                              <span className="text-sm text-gray-500">No categories available</span>
+                            </div>
+                          ) : (
+                            categories.map((category) => (
+                              <SelectItem 
+                                key={category._id} 
+                                value={category._id} 
+                                className="focus:bg-blue-50 focus:text-blue-700"
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <div 
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: category.color }}
+                                  />
+                                  <span>{category.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
+                      {!categoriesLoading && categories.length === 0 && (
+                        <p className="text-sm text-red-500">
+                          Categories could not be loaded. Please refresh the page.
+                        </p>
+                      )}
                     </div>
                   </div>
 

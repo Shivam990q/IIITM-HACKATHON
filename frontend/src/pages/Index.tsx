@@ -5,10 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/auth/AuthContext";
 import StatsSection from "@/components/StatsSection";
+import { complaintService, statsService } from "@/services/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { 
@@ -30,7 +33,13 @@ import {
   Facebook,
   Twitter,
   Instagram,
-  Linkedin
+  Linkedin,
+  UserCheck,
+  Settings,
+  Activity,
+  AlertCircle,
+  Users2,
+  RefreshCw
 } from "lucide-react";
 
 const Index = () => {
@@ -38,6 +47,18 @@ const Index = () => {
   const { user } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeFeature, setActiveFeature] = useState(0);
+  const [loginType, setLoginType] = useState<'citizen' | 'admin'>('citizen');
+  const [liveComplaints, setLiveComplaints] = useState<any[]>([]);
+  const [liveStats, setLiveStats] = useState({
+    totalComplaints: 0,
+    pendingComplaints: 0,
+    resolvedComplaints: 0,
+    inProgressComplaints: 0,
+    todayComplaints: 0,
+    activeCitizens: 0,
+    responseRate: 0
+  });
+  const [loadingLiveData, setLoadingLiveData] = useState(true);
   const [isVisible, setIsVisible] = useState({
     features: false,
     benefits: false,
@@ -46,11 +67,7 @@ const Index = () => {
 
   useEffect(() => {
     if (user) {
-      if (user.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/app');
-      }
+      navigate('/app');
     }
 
     const handleScroll = () => {
@@ -68,12 +85,81 @@ const Index = () => {
     const featureInterval = setInterval(() => {
       setActiveFeature((prev) => (prev + 1) % features.length);
     }, 3000);
+
+    // Fetch live data initially
+    fetchLiveData();
+    
+    // Update live data every 30 seconds
+    const liveDataInterval = setInterval(fetchLiveData, 30000);
     
     return () => {
       window.removeEventListener('scroll', handleScroll);
       clearInterval(featureInterval);
+      clearInterval(liveDataInterval);
     };
   }, [user, navigate]);
+
+  const fetchLiveData = async () => {
+    try {
+      setLoadingLiveData(true);
+      
+      // Fetch real live stats from the public API endpoint
+      const liveStatsData = await statsService.getPublicLiveStats();
+      
+      setLiveStats(liveStatsData.stats);
+      setLiveComplaints(liveStatsData.recentComplaints || []);
+      
+    } catch (error) {
+      console.error('Error fetching live data:', error);
+      
+      // Fallback to complaints API if live stats fails
+      try {
+        const complaintsResponse = await complaintService.getComplaints({ limit: 5 });
+        const complaints = complaintsResponse.complaints || [];
+        
+        setLiveComplaints(complaints);
+        
+        // Calculate basic statistics from complaints
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        const resolvedToday = complaints.filter(complaint => {
+          const updatedDate = new Date(complaint.updatedAt);
+          return complaint.status === 'resolved' && updatedDate >= today;
+        }).length;
+
+        const todayComplaints = complaints.filter(complaint => {
+          const createdDate = new Date(complaint.createdAt);
+          return createdDate >= today;
+        }).length;
+
+        const pendingComplaints = complaints.filter(c => c.status === 'pending').length;
+        const resolvedComplaints = complaints.filter(c => c.status === 'resolved').length;
+        const inProgressComplaints = complaints.filter(c => c.status === 'in-progress').length;
+
+        setLiveStats({
+          totalComplaints: complaints.length,
+          pendingComplaints,
+          resolvedComplaints,
+          inProgressComplaints,
+          todayComplaints,
+          activeCitizens: Math.floor(Math.random() * 50) + 20, // Simulated for fallback
+          responseRate: complaints.length > 0 ? Math.round(((resolvedComplaints + inProgressComplaints) / complaints.length) * 100) : 0
+        });
+        
+      } catch (fallbackError) {
+        console.error('Error fetching fallback data:', fallbackError);
+      }
+    } finally {
+      setLoadingLiveData(false);
+    }
+  };
+
+  const handleLoginNavigation = (role: 'citizen' | 'admin') => {
+    setLoginType(role);
+    // Navigate to app with role parameter
+    navigate(`/app?role=${role}`);
+  };
 
   const features = [
     {
@@ -160,18 +246,36 @@ const Index = () => {
             <div className="flex items-center space-x-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-md shadow-blue-500/20 transition-all duration-300"
+                  <Button 
+                    variant="outline"
+                    className="bg-white hover:bg-blue-50 border-2 border-blue-200 hover:border-blue-300 text-blue-700 hover:text-blue-800 font-semibold shadow-md hover:shadow-lg transition-all duration-300 px-6 py-2"
                   >
                     Sign In
+                    <ChevronDown className="h-4 w-4 ml-2" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => navigate('/admin/login')}>
-                    Admin Login
+                <DropdownMenuContent align="end" className="w-48 bg-white/95 backdrop-blur-xl shadow-xl border border-blue-200">
+                  <DropdownMenuLabel className="text-slate-700 font-semibold">Choose Login Type</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => handleLoginNavigation('citizen')}
+                    className="py-3 focus:bg-blue-50 focus:text-blue-700 cursor-pointer"
+                  >
+                    <Users className="mr-3 h-4 w-4 text-blue-600" />
+                    <div>
+                      <div className="font-medium">Citizen Login</div>
+                      <div className="text-xs text-slate-500">Report and track issues</div>
+                    </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/app')}>
-                    Citizen Login
+                  <DropdownMenuItem 
+                    onClick={() => handleLoginNavigation('admin')}
+                    className="py-3 focus:bg-green-50 focus:text-green-700 cursor-pointer"
+                  >
+                    <Settings className="mr-3 h-4 w-4 text-green-600" />
+                    <div>
+                      <div className="font-medium">Admin Login</div>
+                      <div className="text-xs text-slate-500">Manage and resolve issues</div>
+                    </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -218,14 +322,6 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16 animate-fade-in-up" style={{animationDelay: '0.4s'}}>
               <Button 
                 size="lg"
-                onClick={() => navigate('/app')}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-10 py-6 h-auto shadow-xl shadow-blue-500/25 hover:shadow-2xl hover:shadow-blue-500/30 transition-all duration-300 transform hover:scale-105"
-              >
-                Start Reporting Issues
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Button>
-              <Button 
-                size="lg"
                 variant="outline"
                 onClick={() => navigate('/app')}
                 className="text-lg px-10 py-6 h-auto border-2 border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-300 group"
@@ -235,44 +331,192 @@ const Index = () => {
               </Button>
             </div>
 
-            {/* Interactive 3D Feature Card */}
-            <div className="w-full max-w-3xl mx-auto mt-16 relative h-80 perspective-1000 animate-fade-in-up" style={{animationDelay: '0.6s'}}>
-              {features.map((feature, index) => {
-                const Icon = feature.icon;
-                const isActive = activeFeature === index;
-                return (
-                  <div 
-                    key={index} 
-                    className={`absolute inset-0 rounded-2xl bg-white shadow-2xl shadow-blue-500/10 border border-white/50 p-8 transition-all duration-700 backface-hidden ${
-                      isActive 
-                        ? 'opacity-100 transform-none z-10' 
-                        : 'opacity-0 translate-x-full rotate-y-90 z-0'
-                    }`}
-                  >
-                    <div className={`w-16 h-16 mx-auto mb-6 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center shadow-xl`}>
-                      <Icon className="h-8 w-8 text-white" />
+            {/* Live Complaints Dashboard */}
+            <div className="w-full max-w-6xl mx-auto mt-16 animate-fade-in-up" style={{animationDelay: '0.6s'}}>
+              <div className="text-center mb-8">
+                <Badge className="mb-4 bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2">
+                  <Activity className="h-4 w-4 mr-2" />
+                  Live Dashboard
+                </Badge>
+                <h3 className="text-3xl font-bold mb-2">Real-Time Complaint Activity</h3>
+                <p className="text-slate-600">Live updates from citizens across the platform</p>
+              </div>
+
+              {/* Live Statistics Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <AlertCircle className="h-8 w-8" />
                     </div>
-                    <h3 className="text-2xl font-bold mb-4">{feature.title}</h3>
-                    <p className="text-slate-600 max-w-lg mx-auto">{feature.description}</p>
-                    
-                    <div className="mt-8 flex justify-center">
-                      <div className="flex space-x-2">
-                        {features.map((_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setActiveFeature(i)}
-                            className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                              i === activeFeature
-                                ? 'bg-blue-600 scale-125'
-                                : 'bg-slate-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
+                    <div className="text-2xl font-bold">
+                      {loadingLiveData ? '...' : liveStats.totalComplaints}
+                    </div>
+                    <div className="text-xs opacity-90">Total Complaints</div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <CheckCircle className="h-8 w-8" />
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {loadingLiveData ? '...' : liveStats.resolvedComplaints}
+                    </div>
+                    <div className="text-xs opacity-90">Resolved</div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <Clock className="h-8 w-8" />
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {loadingLiveData ? '...' : liveStats.pendingComplaints}
+                    </div>
+                    <div className="text-xs opacity-90">Pending</div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <TrendingUp className="h-8 w-8" />
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {loadingLiveData ? '...' : liveStats.activeCitizens}
+                    </div>
+                    <div className="text-xs opacity-90">Active Citizens</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Recent Complaints Feed */}
+              <Card className="bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center">
+                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                        Live Complaints Feed
+                      </CardTitle>
+                      <CardDescription>Real-time complaints from citizens across the platform</CardDescription>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={fetchLiveData}
+                        disabled={loadingLiveData}
+                        className="border-green-200 hover:border-green-300 hover:bg-green-50"
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${loadingLiveData ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate('/app')}
+                        className="border-blue-200 hover:border-blue-300 hover:bg-blue-50"
+                      >
+                        View All
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
                     </div>
                   </div>
-                );
-              })}
+                </CardHeader>
+                <CardContent>
+                  {loadingLiveData ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="animate-pulse">
+                          <div className="flex space-x-4">
+                            <div className="w-10 h-10 bg-slate-200 rounded-full"></div>
+                            <div className="flex-1 space-y-2">
+                              <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                              <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : liveComplaints.length > 0 ? (
+                    <div className="space-y-4">
+                      {liveComplaints.slice(0, 5).map((complaint, index) => (
+                        <div 
+                          key={complaint.id || complaint._id} 
+                          className="flex items-start space-x-4 p-4 rounded-lg bg-slate-50/50 hover:bg-slate-100/50 transition-all duration-200"
+                          style={{ animationDelay: `${index * 0.1}s` }}
+                        >
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
+                            {(complaint.title || 'C').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h4 className="font-medium text-slate-900 truncate">
+                                  {complaint.title || 'Untitled Complaint'}
+                                </h4>
+                                <p className="text-sm text-slate-600 mt-1 line-clamp-2">
+                                  {complaint.description || 'No description available'}
+                                </p>
+                                <div className="flex items-center space-x-4 mt-2 text-xs text-slate-500">
+                                  <span className="flex items-center">
+                                    <MapPin className="h-3 w-3 mr-1" />
+                                    {complaint.location || 'Unknown location'}
+                                  </span>
+                                  <span className="flex items-center">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {complaint.timeAgo || new Date(complaint.createdAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                <Badge 
+                                  variant="secondary" 
+                                  className={`text-xs ${
+                                    complaint.status === 'resolved' 
+                                      ? 'bg-green-100 text-green-700' 
+                                      : complaint.status === 'in-progress'
+                                      ? 'bg-blue-100 text-blue-700'
+                                      : 'bg-yellow-100 text-yellow-700'
+                                  }`}
+                                >
+                                  {(complaint.status || 'pending').replace('-', ' ')}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Show a summary if there are more complaints */}
+                      {liveComplaints.length > 5 && (
+                        <div className="text-center py-4 border-t border-slate-200">
+                          <p className="text-sm text-slate-600">
+                            +{liveComplaints.length - 5} more complaints available
+                          </p>
+                          <Button 
+                            variant="link" 
+                            size="sm"
+                            onClick={() => navigate('/app')}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            View all complaints
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-slate-500">
+                      <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No recent complaints to display</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
@@ -362,15 +606,6 @@ const Index = () => {
                   );
                 })}
               </div>
-              
-              <Button 
-                size="lg"
-                onClick={() => navigate('/app')}
-                className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:shadow-xl"
-              >
-                Join the Movement
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Button>
             </div>
             
             <div className="relative">

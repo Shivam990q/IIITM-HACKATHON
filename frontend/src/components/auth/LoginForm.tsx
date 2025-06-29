@@ -3,17 +3,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from './AuthContext';
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft, User } from 'lucide-react';
+import { Shield, Eye, EyeOff, Mail, Lock, User, ArrowRight, ArrowLeft, Home, Users, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginFormProps {
   onToggleMode: () => void;
   isRegister: boolean;
+  loginRole?: 'citizen' | 'admin';
+  onRoleChange?: (role: 'citizen' | 'admin') => void;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isRegister }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isRegister, loginRole = 'citizen', onRoleChange }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -32,19 +35,23 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isRegister }) => {
     try {
       let success = false;
       if (isRegister) {
-        success = await register(formData.name, formData.email, formData.password);
+        success = await register(formData.name, formData.email, formData.password, loginRole);
       } else {
-        success = await login(formData.email, formData.password);
+        success = await login(formData.email, formData.password, loginRole);
       }
 
       if (success) {
         toast({
           title: "Welcome to NyayChain! 🎉",
-          description: `Successfully ${isRegister ? 'registered' : 'logged in'}. Let's build transparency together.`,
+          description: `Successfully ${isRegister ? 'registered' : 'logged in'} as ${loginRole}. Let's build transparency together.`,
         });
-        navigate('/app');
+        // Navigate based on user role
+        if (loginRole === 'admin') {
+          navigate('/app/admin/dashboard');
+        } else {
+          navigate('/app/dashboard');
+        }
       } else {
-        // This case might not be hit if login throws an error, but it's a good fallback.
         toast({
           title: "Authentication Failed",
           description: "Please check your credentials and try again.",
@@ -55,7 +62,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isRegister }) => {
       console.error('Authentication error:', error);
       toast({
         title: "Authentication Failed",
-        description: error.message || "An unknown error occurred. Please try again.",
+        description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
     } finally {
@@ -96,14 +103,48 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, isRegister }) => {
               <Shield className="h-8 w-8 text-white" />
             </div>
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-700 via-purple-600 to-emerald-600 bg-clip-text text-transparent">
-              {isRegister ? 'Join NyayChain' : 'Welcome Back, Citizen'}
+              {isRegister ? 'Join NyayChain' : 'Welcome Back'}
             </CardTitle>
             <CardDescription className="text-lg text-slate-600">
               {isRegister 
-                ? 'Create your account to start building transparent governance'
-                : 'Sign in to access your civic dashboard'
+                ? `Create your ${loginRole} account to start building transparent governance`
+                : `Sign in to your ${loginRole} dashboard`
               }
             </CardDescription>
+            {/* Role Badge */}
+            <div className="flex justify-center mt-4">
+              <Badge className={`${
+                loginRole === 'admin' 
+                  ? 'bg-green-100 text-green-700 border-green-200' 
+                  : 'bg-blue-100 text-blue-700 border-blue-200'
+              } px-4 py-2 font-semibold`}>
+                {loginRole === 'admin' ? (
+                  <>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Admin Login
+                  </>
+                ) : (
+                  <>
+                    <Users className="h-4 w-4 mr-2" />
+                    Citizen Login
+                  </>
+                )}
+              </Badge>
+            </div>
+            {/* Change Role Button */}
+            {onRoleChange && (
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRoleChange(loginRole === 'admin' ? 'citizen' : 'admin')}
+                  className="text-xs text-slate-500 hover:text-blue-600 transition-colors"
+                >
+                  Switch to {loginRole === 'admin' ? 'Citizen' : 'Admin'} Login
+                </Button>
+              </div>
+            )}
           </CardHeader>
           
           <CardContent className="space-y-6">

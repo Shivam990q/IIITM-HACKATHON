@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth.routes');
 const complaintRoutes = require('./routes/complaint.routes');
 const userRoutes = require('./routes/user.routes');
 const statsRoutes = require('./routes/stats.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 // Initialize express app
 const app = express();
@@ -60,6 +61,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/categories', require('./routes/category.routes'));
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -83,8 +86,13 @@ console.log('Connecting to MongoDB at:', MONGODB_URI);
 
 mongoose
   .connect(MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     console.log('✅ Connected to MongoDB successfully');
+    
+    // Initialize default categories
+    const Category = require('./models/category.model');
+    await Category.initializeDefaultCategories();
+    
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📖 API Documentation: http://localhost:${PORT}/api/health`);

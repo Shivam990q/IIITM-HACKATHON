@@ -90,6 +90,9 @@ exports.getComplaints = async (req, res) => {
     if (status) queryObj.status = status;
     if (category) queryObj.category = category;
 
+    // Public access: All complaints are visible to everyone for transparency
+    // This supports the public accountability dashboard
+
     // Add location-based query if coordinates provided
     if (req.query.lat && req.query.lng && req.query.radius) {
       const { lat, lng, radius } = req.query;
@@ -113,7 +116,8 @@ exports.getComplaints = async (req, res) => {
       .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit))
       .populate('submittedBy', 'name')
-      .populate('assignedTo', 'name role');
+      .populate('assignedTo', 'name role')
+      .populate('category', 'name icon color');
 
     res.status(200).json({
       status: 'success',
@@ -148,7 +152,8 @@ exports.getComplaint = async (req, res) => {
       .populate('submittedBy', 'name')
       .populate('assignedTo', 'name role')
       .populate('comments.user', 'name role')
-      .populate('statusUpdates.updatedBy', 'name role');
+      .populate('statusUpdates.updatedBy', 'name role')
+      .populate('category', 'name icon color description');
 
     if (!complaint) {
       return res.status(404).json({
